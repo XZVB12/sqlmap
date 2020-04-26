@@ -935,27 +935,39 @@ def setColor(message, color=None, bold=False, level=None, istty=None):
 
     >>> setColor("Hello World", color="red", istty=True)
     '\\x1b[31mHello World\\x1b[0m'
+    >>> setColor("[INFO] Hello World", istty=True)
+    '[\\x1b[32mINFO\\x1b[0m] Hello World'
+    >>> setColor("[INFO] Hello [CRITICAL] World", istty=True)
+    '[INFO] Hello [CRITICAL] World'
     """
 
     retVal = message
-    level = level or extractRegexResult(r"\[(?P<result>%s)\]" % '|'.join(_[0] for _ in getPublicTypeMembers(LOGGING_LEVELS)), message)
 
-    if message and (IS_TTY or istty) and not conf.get("disableColoring"):  # colorizing handler
-        if bold or color:
-            retVal = colored(message, color=color, on_color=None, attrs=("bold",) if bold else None)
-        elif level:
-            try:
-                level = getattr(logging, level, None)
-            except:
-                level = None
-            retVal = LOGGER_HANDLER.colorize(message, level)
-        else:
-            match = re.search(r"\(([^)]*)\s*fork\)", message)
-            if match:
-                retVal = retVal.replace(match.group(1), colored(match.group(1), color="lightgrey"))
+    if message:
+        if (IS_TTY or istty) and not conf.get("disableColoring"):  # colorizing handler
+            if level is None:
+                levels = re.findall(r"\[(?P<result>%s)\]" % '|'.join(_[0] for _ in getPublicTypeMembers(LOGGING_LEVELS)), message)
 
-            for match in re.finditer(r"[^\w]'([^\n']+)'", message):  # single-quoted (Note: watch-out for the banner)
-                retVal = retVal.replace(match.group(1), colored(match.group(1), color="lightgrey"))
+                if len(levels) == 1:
+                    level = levels[0]
+
+            if bold or color:
+                retVal = colored(message, color=color, on_color=None, attrs=("bold",) if bold else None)
+            elif level:
+                try:
+                    level = getattr(logging, level, None)
+                except:
+                    level = None
+                retVal = LOGGER_HANDLER.colorize(message, level)
+            else:
+                match = re.search(r"\(([^)]*)\s*fork\)", message)
+                if match:
+                    retVal = retVal.replace(match.group(1), colored(match.group(1), color="lightgrey"))
+
+                for match in re.finditer(r"([^\w])'([^\n']+)'", message):  # single-quoted (Note: watch-out for the banner)
+                    retVal = retVal.replace(match.group(0), "%s'%s'" % (match.group(1), colored(match.group(2), color="lightgrey")))
+
+        message = message.strip()
 
     return retVal
 
@@ -974,10 +986,16 @@ def clearColors(message):
 
     return retVal
 
-def dataToStdout(data, forceOutput=False, bold=False, content_type=None, status=CONTENT_STATUS.IN_PROGRESS):
+def dataToStdout(data, forceOutput=False, bold=False, contentType=None, status=CONTENT_STATUS.IN_PROGRESS, coloring=True):
     """
     Writes text to the stdout (console) stream
     """
+
+    if not IS_TTY and isinstance(data, six.string_types) and data.startswith("\r"):
+        if re.search(r"\(\d+%\)", data):
+            data = ""
+        else:
+            data = "\n%s" % data.strip("\r")
 
     if not kb.get("threadException"):
         if forceOutput or not (getCurrentThreadData().disableStdOut or kb.get("wizardMode")):
@@ -987,9 +1005,9 @@ def dataToStdout(data, forceOutput=False, bold=False, content_type=None, status=
 
             try:
                 if conf.get("api"):
-                    sys.stdout.write(stdoutEncode(clearColors(data)), status, content_type)
+                    sys.stdout.write(stdoutEncode(clearColors(data)), status, contentType)
                 else:
-                    sys.stdout.write(stdoutEncode(setColor(data, bold=bold)))
+                    sys.stdout.write(stdoutEncode(setColor(data, bold=bold) if coloring else clearColors(data)))
 
                 sys.stdout.flush()
             except IOError:
@@ -1204,9 +1222,9 @@ def randomStr(length=4, lowercase=False, alphabet=None, seed=None):
     """
 
     if seed is not None:
-        _ = getCurrentThreadData().random
-        _.seed(seed)
-        choice = _.choice
+        _random = getCurrentThreadData().random
+        _random.seed(seed)
+        choice = _random.choice
     else:
         choice = random.choice
 
@@ -1238,10 +1256,12 @@ def getHeader(headers, key):
     """
 
     retVal = None
-    for _ in (headers or {}):
-        if _.upper() == key.upper():
-            retVal = headers[_]
+
+    for header in (headers or {}):
+        if header.upper() == key.upper():
+            retVal = headers[header]
             break
+
     return retVal
 
 def checkPipedInput():
@@ -1422,6 +1442,7 @@ def setPaths(rootPath):
             checkFile(path)
 
     if IS_WIN:
+        # Reference: https://pureinfotech.com/list-environment-variables-windows-10/
         if os.getenv("LOCALAPPDATA"):
             paths.SQLMAP_HOME_PATH = os.path.expandvars("%LOCALAPPDATA%\\sqlmap")
         elif os.getenv("USERPROFILE"):
@@ -1435,7 +1456,7 @@ def setPaths(rootPath):
     paths.SQLMAP_DUMP_PATH = os.path.join(paths.SQLMAP_OUTPUT_PATH, "%s", "dump")
     paths.SQLMAP_FILES_PATH = os.path.join(paths.SQLMAP_OUTPUT_PATH, "%s", "files")
 
-    # history files
+    # History files
     paths.SQLMAP_HISTORY_PATH = getUnicode(os.path.join(paths.SQLMAP_HOME_PATH, "history"), encoding=sys.getfilesystemencoding() or UNICODE_ENCODING)
     paths.API_SHELL_HISTORY = os.path.join(paths.SQLMAP_HISTORY_PATH, "api.hst")
     paths.OS_SHELL_HISTORY = os.path.join(paths.SQLMAP_HISTORY_PATH, "os.hst")
@@ -1592,7 +1613,7 @@ def parseTargetUrl():
     originalUrl = conf.url
 
     if re.search(r"\[.+\]", conf.url) and not socket.has_ipv6:
-        errMsg = "IPv6 addressing is not supported "
+        errMsg = "IPv6 communication is not supported "
         errMsg += "on this platform"
         raise SqlmapGenericException(errMsg)
 
@@ -1649,7 +1670,7 @@ def parseTargetUrl():
         conf.port = 80
 
     if conf.port < 1 or conf.port > 65535:
-        errMsg = "invalid target URL's port (%d)" % conf.port
+        errMsg = "invalid target URL port (%d)" % conf.port
         raise SqlmapSyntaxException(errMsg)
 
     conf.url = getUnicode("%s://%s:%d%s" % (conf.scheme, ("[%s]" % conf.hostname) if conf.ipv6 else conf.hostname, conf.port, conf.path))

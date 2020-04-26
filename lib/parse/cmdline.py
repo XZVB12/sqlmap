@@ -616,6 +616,9 @@ def cmdLineParser(argv=None):
         general.add_argument("--answers", dest="answers",
             help="Set predefined answers (e.g. \"quit=N,follow=N\")")
 
+        general.add_argument("--base64", dest="base64Parameter",
+            help="Parameter(s) containing Base64 encoded data")
+
         general.add_argument("--batch", dest="batch", action="store_true",
             help="Never ask for user input, use the default behavior")
 
@@ -683,7 +686,7 @@ def cmdLineParser(argv=None):
             help="Save options to a configuration INI file")
 
         general.add_argument("--scope", dest="scope",
-            help="Regexp to filter targets from provided proxy log")
+            help="Regexp for filtering targets")
 
         general.add_argument("--skip-waf", dest="skipWaf", action="store_true",
             help="Skip heuristic detection of WAF/IPS protection")
@@ -746,9 +749,6 @@ def cmdLineParser(argv=None):
             help="Simple wizard interface for beginner users")
 
         # Hidden and/or experimental options
-        parser.add_argument("--base64", dest="base64Parameter",
-            help=SUPPRESS)  # "Parameter(s) containing Base64 encoded values"
-
         parser.add_argument("--crack", dest="hashFile",
             help=SUPPRESS)  # "Load and crack hashes from a file (standalone)"
 
@@ -759,6 +759,9 @@ def cmdLineParser(argv=None):
             help=SUPPRESS)
 
         parser.add_argument("--debug", dest="debug", action="store_true",
+            help=SUPPRESS)
+
+        parser.add_argument("--disable-multi", dest="disableMulti", action="store_true",
             help=SUPPRESS)
 
         parser.add_argument("--disable-precon", dest="disablePrecon", action="store_true",

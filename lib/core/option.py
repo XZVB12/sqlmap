@@ -425,6 +425,9 @@ def _setBulkMultipleTargets():
 
     found = False
     for line in getFileItems(conf.bulkFile):
+        if conf.scope and not re.search(conf.scope, line, re.I):
+            continue
+
         if re.match(r"[^ ]+\?(.+)", line, re.I) or kb.customInjectionMark in line:
             found = True
             kb.targets.add((line.strip(), conf.method, conf.data, conf.cookie, None))
@@ -1913,6 +1916,7 @@ def _setKnowledgeBaseAttributes(flushAll=True):
     kb.errorIsNone = True
     kb.falsePositives = []
     kb.fileReadMode = False
+    kb.fingerprinted = False
     kb.followSitemapRecursion = None
     kb.forcedDbms = None
     kb.forcePartialUnion = False
