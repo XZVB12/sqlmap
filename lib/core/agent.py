@@ -172,7 +172,7 @@ class Agent(object):
 
             newValue = "%s%s" % (value, newValue)
 
-        newValue = self.cleanupPayload(newValue, origValue)
+        newValue = self.cleanupPayload(newValue, origValue) or ""
 
         if base64Encoding:
             _newValue = newValue
@@ -183,15 +183,19 @@ class Agent(object):
                 newValue = self.adjustLateValues(newValue)
 
             # TODO: support for POST_HINT
-            newValue = encodeBase64(newValue, binary=False, encoding=conf.encoding or UNICODE_ENCODING)
-            origValue = encodeBase64(origValue, binary=False, encoding=conf.encoding or UNICODE_ENCODING)
+            newValue = encodeBase64(newValue, binary=False, encoding=conf.encoding or UNICODE_ENCODING, safe=conf.base64Safe)
+
+            if parameter in kb.base64Originals:
+                origValue = kb.base64Originals[parameter]
+            else:
+                origValue = encodeBase64(origValue, binary=False, encoding=conf.encoding or UNICODE_ENCODING)
 
         if place in (PLACE.URI, PLACE.CUSTOM_POST, PLACE.CUSTOM_HEADER):
             _ = "%s%s" % (origValue, kb.customInjectionMark)
 
             if kb.postHint == POST_HINT.JSON and not isNumber(newValue) and '"%s"' % _ not in paramString:
                 newValue = '"%s"' % self.addPayloadDelimiters(newValue)
-            elif kb.postHint == POST_HINT.JSON_LIKE and not isNumber(newValue) and "'%s'" % _ not in paramString:
+            elif kb.postHint == POST_HINT.JSON_LIKE and not isNumber(newValue) and re.search(r"['\"]%s['\"]" % re.escape(_), paramString) is None:
                 newValue = "'%s'" % self.addPayloadDelimiters(newValue)
             else:
                 newValue = self.addPayloadDelimiters(newValue)

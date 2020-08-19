@@ -622,6 +622,9 @@ def cmdLineParser(argv=None):
         general.add_argument("--base64", dest="base64Parameter",
             help="Parameter(s) containing Base64 encoded data")
 
+        general.add_argument("--base64-safe", dest="base64Safe", action="store_true",
+            help="Use URL and filename safe Base64 alphabet")
+
         general.add_argument("--batch", dest="batch", action="store_true",
             help="Never ask for user input, use the default behavior")
 
@@ -955,11 +958,13 @@ def cmdLineParser(argv=None):
                 else:
                     argv[tamperIndex] = "%s,%s" % (argv[tamperIndex], argv[i].split('=')[1] if '=' in argv[i] else (argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith('-') else ""))
                     argv[i] = ""
-            elif argv[i] == "-H":
+            elif argv[i] in ("-H", "--header"):
                 if i + 1 < len(argv):
                     extraHeaders.append(argv[i + 1])
             elif argv[i] == "--deps":
                 argv[i] = "--dependencies"
+            elif argv[i] == "--disable-colouring":
+                argv[i] = "--disable-coloring"
             elif argv[i] == "-r":
                 for j in xrange(i + 2, len(argv)):
                     value = argv[j]
