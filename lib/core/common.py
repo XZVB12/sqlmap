@@ -215,7 +215,7 @@ class UnicodeRawConfigParser(_configparser.RawConfigParser):
             fp.write("[%s]\n" % _configparser.DEFAULTSECT)
 
             for (key, value) in self._defaults.items():
-                fp.write("%s = %s\n" % (key, getUnicode(value, UNICODE_ENCODING).replace('\n', '\n\t')))
+                fp.write("\t%s = %s" % (key, getUnicode(value, UNICODE_ENCODING)))
 
             fp.write("\n")
 
@@ -225,9 +225,9 @@ class UnicodeRawConfigParser(_configparser.RawConfigParser):
             for (key, value) in self._sections[section].items():
                 if key != "__name__":
                     if value is None:
-                        fp.write("%s\n" % (key))
-                    else:
-                        fp.write("%s = %s\n" % (key, getUnicode(value, UNICODE_ENCODING).replace('\n', '\n\t')))
+                        fp.write("\t%s\n" % (key))
+                    elif not isListLike(value):
+                        fp.write("\t%s = %s\n" % (key, getUnicode(value, UNICODE_ENCODING)))
 
             fp.write("\n")
 
@@ -1749,7 +1749,7 @@ def expandAsteriskForColumns(expression):
     the SQL query string (expression)
     """
 
-    match = re.search(r"(?i)\ASELECT(\s+TOP\s+[\d]+)?\s+\*\s+FROM\s+`?([^`\s()]+)", expression)
+    match = re.search(r"(?i)\ASELECT(\s+TOP\s+[\d]+)?\s+\*\s+FROM\s+((`[^`]+`|[^\s]+)+)", expression)
 
     if match:
         infoMsg = "you did not provide the fields in your query. "
@@ -3614,7 +3614,7 @@ def isListLike(value):
     False
     """
 
-    return isinstance(value, (list, tuple, set, BigArray))
+    return isinstance(value, (list, tuple, set, OrderedSet, BigArray))
 
 def getSortedInjectionTests():
     """
